@@ -36,7 +36,7 @@ class SimpleNN:
     def cross_entropy_loss(self, y, y1):
         return -np.mean(y*np.log(y1+1e-8))
 
-    def init_params(self, rand=False, seed=42):
+    def init_params(self, rand=False, seed=1):
         params = {}
         self.__random_seed = seed
         np.random.seed(seed)
@@ -52,16 +52,16 @@ class SimpleNN:
         return params
 
     def forward(self, X):
-        self.layers["input"] = X
-        for l in range(1, self.__L-1):
+        self.layers["input"] = X.T
+        for l in range(1, self.__L):
             if l == 1:
-                self.layers["W" + str(l)] = self.sigmoid(np.dot(self.layers["input"], self.weights["W" + str(l)]) \
-                                                        + self.weights["b" + str(l)])
+                self.layers["W" + str(l)] = self.sigmoid(np.dot(self.weights["W" + str(l)], self.layers["input"]) + self.weights["b" + str(l)])
+                #self.layers["W" + str(l)] = self.sigmoid(np.dot(self.layers["input"], self.weights["W" + str(l)]) + self.weights["b" + str(l)])
             else:
-                self.layers["W" + str(l)] = self.sigmoid(np.dot(self.layers["W" + str(l-1)], self.weights["W" + str(l)]) \
+                self.layers["W" + str(l)] = self.sigmoid(np.dot(self.weights["W" + str(l)], self.layers["W" + str(l-1)]) \
                                                         + self.weights["b" + str(l)])
         # last forward step - softmax activation
-        self.layers["output"] = self.softmax(np.dot(self.layers["W" + str(self.__L-1)], self.weights["W" + str(self.__L)]) \
+        self.layers["output"] = self.softmax(np.dot(self.weights["W" + str(self.__L)], self.layers["W" + str(self.__L-1)]) \
                                                         + self.weights["b" + str(self.__L)])
         return self.layers["output"]
 
@@ -99,11 +99,12 @@ class SimpleNN:
         self.data["X"] = x
         self.data["Y"] = y
         self.n = self.data["X"].shape[0]
-        self.init_params()
         self.history["loss"] = []
         self.history["acc"] = []
+        self.layers_size.insert(0, self.data["X"].shape[1])
+        self.weights = self.init_params(rand=True)
 
-        for epoch in self.train_params["epochs"]:
+        for epoch in range(self.train_params["epochs"]):
             self.forward(self.data["X"])
             cost = self.cross_entropy_loss(self.data["Y"], self.layers["output"])
             if epoch%10 == 0:
@@ -131,6 +132,8 @@ class SimpleNN:
         del self.layers
 
 def pre_process_data(train_x, train_y, test_x, test_y):
+    train_x = train_x.reshape((train_x.shape[0], 784))
+    test_x = test_x.reshape((test_x.shape[0], 784))
     # Normalize
     train_x = train_x / 255.
     test_x = test_x / 255.
