@@ -2,6 +2,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from sklearn.preprocessing import OneHotEncoder
 from keras.datasets import mnist
+from tqdm import tqdm
 
 class SimpleNN:
     def __init__(self, layers_list, type='classification'):
@@ -43,7 +44,9 @@ class SimpleNN:
         if rand:
             for i in range(1, len(self.layers_size)):
                 self.weights['W' + str(i)] = np.random.randn(self.layers_size[i], self.layers_size[i - 1])
-                self.weights['b' + str(i)] = np.random.randn(self.layers_size[i], 1)
+                #self.weights['b' + str(i)] = np.random.randn(self.layers_size[i], 1)
+                self.weights['b' + str(i)] = np.zeros((self.layers_size[i], 1))
+
         else:
             for i in range(1, self.L):
                 self.weights['W' + str(i)] = np.zeros((self.layers_size[i], self.layers_size[i - 1]))
@@ -92,7 +95,7 @@ class SimpleNN:
             self.weights["W" + str(l)] = self.weights["W" + str(l)] - self.train_params["lr"] * d_weights["W" + str(l)]
             self.weights["b" + str(l)] = self.weights["b" + str(l)] - self.train_params["lr"] * d_weights["b" + str(l)]
 
-    def fit(self, x, y, lr = 0.01, n_iters = 2000):
+    def fit(self, x, y, lr=0.1, n_iters=2000, lr_decay=False):
         self.train_params["lr"] = lr
         self.train_params["epochs"] = n_iters
         self.data["X"] = x
@@ -103,16 +106,24 @@ class SimpleNN:
         self.layers_size.insert(0, self.data["X"].shape[1])
         self.init_params(rand=True)
 
-        for epoch in range(self.train_params["epochs"]):
+        loop = tqdm(range(self.train_params["epochs"]))
+        for epoch in loop:
+#        for epoch in range(self.train_params["epochs"]):
             self.forward(self.data["X"])
             cost = self.cross_entropy_loss(self.data["Y"], self.layers["output"].T)
             self.backward()
             if epoch%10 == 0:
                 self.history["loss"].append(cost)
-            if epoch%100 == 0:
+            if epoch%300 == 0:
                 pred = self.predict(self.data["X"], self.data["Y"])
                 self.history["acc"].append(pred)
-                print("epoch: ", epoch, "CrossEntropyLoss: ", cost, "train Accuracy: ", pred)
+                #print("epoch: ", epoch, "CrossEntropyLoss: ", cost, "train Accuracy: ", pred)
+                print("\ntrain Accuracy: ", pred)
+                if epoch >= 600 and lr_decay:
+                    self.train_params["lr"] = 0.01
+
+            loop.set_description(f"Epoch [{epoch}/{self.train_params['epochs']}]")
+            loop.set_postfix(loss=cost)
 
     def predict(self, X, Y):
         output = self.forward(X)
@@ -127,9 +138,13 @@ class SimpleNN:
         plt.ylabel("cost")
         plt.show()
 
+    def log(self): # history and config to the file.txt
+        pass
+
     def clean_memory(self):
         del self.data
         del self.layers
+
 
 def pre_process_data(train_x, train_y, test_x, test_y):
     train_x = train_x.reshape((train_x.shape[0], 784))
@@ -157,7 +172,7 @@ if __name__ == '__main__':
     layers_dims = [50, 10]
 
     snn = SimpleNN(layers_dims)
-    snn.fit(train_x, train_y, lr=0.1, n_iters=1000)
+    snn.fit(train_x, train_y, lr=0.1, n_iters=1000, lr_decay=True)
     print("Train Accuracy:", snn.predict(train_x, train_y))
     print("Test Accuracy:", snn.predict(test_x, test_y))
     snn.plot_loss()
