@@ -7,17 +7,17 @@ class SimpleNN:
     def __init__(self, layers_list, type='classification'):
         """
         :param layers_list:
-        :param type: classification or regression (last layer softmax or sigmoid)
-        __L: count of layers
+        :param type: classification or regression for next upgrade
+        L: count of layers
         """
         self.layers_size = layers_list
         self.type = type
         self.layers = {}
         self.weights = {}
 
-        self.__L = len(layers_list)
+        self.L = len(layers_list)
         self.n = 0
-        self.__random_seed = 1
+        self.random_seed = 1
 
         self.history = {}
         self.train_params = {}
@@ -37,23 +37,21 @@ class SimpleNN:
         return -np.mean(y*np.log(y1+1e-8))
 
     def init_params(self, rand=False, seed=1):
-        params = {}
-        self.__random_seed = seed
+        self.random_seed = seed
         np.random.seed(seed)
 
         if rand:
-            for i in range(1, self.__L):
-                params['W' + str(i)] = np.random.randn(self.layers_size[i], self.layers_size[i - 1])
-                params['b' + str(i)] = np.random.randn(self.layers_size[i], 1)
+            for i in range(1, len(self.layers_size)):
+                self.weights['W' + str(i)] = np.random.randn(self.layers_size[i], self.layers_size[i - 1])
+                self.weights['b' + str(i)] = np.random.randn(self.layers_size[i], 1)
         else:
-            for i in range(1, self.__L):
-                params['W' + str(i)] = np.zeros((self.layers_size[i], self.layers_size[i - 1]))
-                params['b' + str(i)] = np.zeros((self.layers_size[i], 1))
-        return params
+            for i in range(1, self.L):
+                self.weights['W' + str(i)] = np.zeros((self.layers_size[i], self.layers_size[i - 1]))
+                self.weights['b' + str(i)] = np.zeros((self.layers_size[i], 1))
 
     def forward(self, X):
         self.layers["input"] = X.T
-        for l in range(1, self.__L):
+        for l in range(1, self.L):
             if l == 1:
                 self.layers["W" + str(l)] = self.sigmoid(np.dot(self.weights["W" + str(l)], self.layers["input"]) + self.weights["b" + str(l)])
                 #self.layers["W" + str(l)] = self.sigmoid(np.dot(self.layers["input"], self.weights["W" + str(l)]) + self.weights["b" + str(l)])
@@ -61,35 +59,36 @@ class SimpleNN:
                 self.layers["W" + str(l)] = self.sigmoid(np.dot(self.weights["W" + str(l)], self.layers["W" + str(l-1)]) \
                                                         + self.weights["b" + str(l)])
         # last forward step - softmax activation
-        self.layers["output"] = self.softmax(np.dot(self.weights["W" + str(self.__L)], self.layers["W" + str(self.__L-1)]) \
-                                                        + self.weights["b" + str(self.__L)])
+        self.layers["output"] = self.softmax(np.dot(self.weights["W" + str(self.L)], self.layers["W" + str(self.L-1)]) \
+                                                        + self.weights["b" + str(self.L)])
         return self.layers["output"]
 
-    def backward(self, Y):
+    def backward(self):
         d_weights = {}
 
         # compute
-        dZ = self.layers["output"] - Y
-        dW = np.dot(dZ, self.layers["W" + str(self.__L - 1)]) / self.n
+        dZ = self.layers["output"] - self.data["Y"].T
+        dW = np.dot(dZ, self.layers["W" + str(self.L - 1)].T) / self.n
         db = np.sum(dZ, axis=1, keepdims=True) / self.n
 
-        dWPrev = self.weights["W" + str(self.__L)]
+        dWPrev = np.dot(self.weights["W" + str(self.L)].T, dZ)
 
-        d_weights["W" + str(self.__L)] = dW
-        d_weights["b" + str(self.__L)] = db
+        d_weights["W" + str(self.L)] = dW
+        d_weights["b" + str(self.L)] = db
 
-        for l in range(self.__L-1, 0, -1):
-            dZ = np.dot(self.weights["W" + str(l+1)], dZ) \
-                    * self.sigmoid_derivative(self.layers["W" + str(l)])
-            dW = 1. / self.n * np.dot(dZ, np.dot(self.layers["W" + str(l-1)], self.weights["W" + str(l)]) \
-                                                        + self.weights["b" + str(l)])
-            db = 1. / self.n * np.sum(dZ, axis=1, keepdims=True)
+        self.layers["W0"] = self.layers["input"]
+
+        for l in range(self.L-1, 0, -1):
+            dZ = np.dot(self.weights["W" + str(l+1)].T, dZ) * self.sigmoid_derivative(self.layers["W" + str(l)])
+            dW = np.dot(dZ, self.layers["W" + str(l-1)].T) / self.n
+#            dW = 1. / self.n * np.dot(dZ, np.dot(self.layers["W" + str(l-1)], self.weights["W" + str(l)]) + self.weights["b" + str(l)])
+            db = np.sum(dZ, axis=1, keepdims=True) / self.n
 
             d_weights["W" + str(l)] = dW
             d_weights["b" + str(l)] = db
 
         # update
-        for l in range(self.__L):
+        for l in range(1, self.L+1):
             self.weights["W" + str(l)] = self.weights["W" + str(l)] - self.train_params["lr"] * d_weights["W" + str(l)]
             self.weights["b" + str(l)] = self.weights["b" + str(l)] - self.train_params["lr"] * d_weights["b" + str(l)]
 
@@ -102,17 +101,18 @@ class SimpleNN:
         self.history["loss"] = []
         self.history["acc"] = []
         self.layers_size.insert(0, self.data["X"].shape[1])
-        self.weights = self.init_params(rand=True)
+        self.init_params(rand=True)
 
         for epoch in range(self.train_params["epochs"]):
             self.forward(self.data["X"])
-            cost = self.cross_entropy_loss(self.data["Y"], self.layers["output"])
+            cost = self.cross_entropy_loss(self.data["Y"], self.layers["output"].T)
+            self.backward()
             if epoch%10 == 0:
                 self.history["loss"].append(cost)
             if epoch%100 == 0:
                 pred = self.predict(self.data["X"], self.data["Y"])
                 self.history["acc"].append(pred)
-                print("CrossEntropyLoss: ", cost, "train Accuracy: ", pred)
+                print("epoch: ", epoch, "CrossEntropyLoss: ", cost, "train Accuracy: ", pred)
 
     def predict(self, X, Y):
         output = self.forward(X)
