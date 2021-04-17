@@ -10,12 +10,13 @@ from matplotlib import pyplot as plt
 from sklearn.preprocessing import OneHotEncoder
 from keras.datasets import mnist
 from tqdm import tqdm
+import argparse
 
 class SimpleNN:
-    def __init__(self, layers_list, type='classification'):
+    def __init__(self, layers_list, type='multi-classification'):
         """
         :param layers_list:
-        :param type: classification or regression for next upgrade
+        :param type: multi-classification or binary for next upgrade
         L: count of layers
         """
         self.layers_size = layers_list
@@ -171,6 +172,10 @@ def pre_process_data(train_x, train_y, test_x, test_y):
     return train_x, train_y, test_x, test_y
 
 if __name__ == '__main__':
+
+#    parser = argparse.ArgumentParser(prog='detection.py')
+#    parser.add_argument('--weights', nargs='+', type=str, default='yolov5s.pt', help='path to weights')
+
     data = mnist.load_data()
     train_x, train_y, test_x, test_y = data[0][0], data[0][1], data[1][0], data[1][1]
 
@@ -179,10 +184,10 @@ if __name__ == '__main__':
     print("train_x's shape: " + str(train_x.shape))
     print("test_x's shape: " + str(test_x.shape))
 
-    layers_dims = [50, 10]
+    layers_dims = [50, 50, 10]
 
     snn = SimpleNN(layers_dims)
-    snn.fit(train_x, train_y, rand=True, lr=0.1, n_iters=1000, lr_decay=True)
+    snn.fit(train_x, train_y, rand=True, lr=0.1, n_iters=100, lr_decay=True)
     print("Train Accuracy:", snn.predict(train_x, train_y))
     print("Test Accuracy:", snn.predict(test_x, test_y))
     snn.plot_loss()
