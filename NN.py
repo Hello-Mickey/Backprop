@@ -1,3 +1,10 @@
+"""
+TODO:
+    1. add "run from config"
+    2. add log function (write runs to the files)
+    3. add lr schedule
+    4. add batch learning
+"""
 import numpy as np
 from matplotlib import pyplot as plt
 from sklearn.preprocessing import OneHotEncoder
@@ -95,7 +102,7 @@ class SimpleNN:
             self.weights["W" + str(l)] = self.weights["W" + str(l)] - self.train_params["lr"] * d_weights["W" + str(l)]
             self.weights["b" + str(l)] = self.weights["b" + str(l)] - self.train_params["lr"] * d_weights["b" + str(l)]
 
-    def fit(self, x, y, lr=0.1, n_iters=2000, lr_decay=False):
+    def fit(self, x, y, lr=0.1, rand=False, n_iters=2000, lr_decay=False):
         self.train_params["lr"] = lr
         self.train_params["epochs"] = n_iters
         self.data["X"] = x
@@ -104,7 +111,7 @@ class SimpleNN:
         self.history["loss"] = []
         self.history["acc"] = []
         self.layers_size.insert(0, self.data["X"].shape[1])
-        self.init_params(rand=True)
+        self.init_params(rand=rand)
 
         loop = tqdm(range(self.train_params["epochs"]))
         for epoch in loop:
@@ -114,16 +121,18 @@ class SimpleNN:
             self.backward()
             if epoch%10 == 0:
                 self.history["loss"].append(cost)
-            if epoch%300 == 0:
+            if epoch%200 == 0:
                 pred = self.predict(self.data["X"], self.data["Y"])
                 self.history["acc"].append(pred)
                 #print("epoch: ", epoch, "CrossEntropyLoss: ", cost, "train Accuracy: ", pred)
-                print("\ntrain Accuracy: ", pred)
-                if epoch >= 600 and lr_decay:
+                print("\ntrain Accuracy: ", pred, "lr: ", self.train_params["lr"])
+                if epoch >= 800 and lr_decay:
                     self.train_params["lr"] = 0.01
-
+                if epoch >= 1000 and lr_decay:
+                    self.train_params["lr"] = 0.001
             loop.set_description(f"Epoch [{epoch}/{self.train_params['epochs']}]")
             loop.set_postfix(loss=cost)
+
 
     def predict(self, X, Y):
         output = self.forward(X)
@@ -133,6 +142,7 @@ class SimpleNN:
         return acc
 
     def plot_loss(self):
+        plt.figure()
         plt.plot(np.arange(len(self.history["loss"])), self.history["loss"])
         plt.xlabel("epochs")
         plt.ylabel("cost")
@@ -172,7 +182,7 @@ if __name__ == '__main__':
     layers_dims = [50, 10]
 
     snn = SimpleNN(layers_dims)
-    snn.fit(train_x, train_y, lr=0.1, n_iters=1000, lr_decay=True)
+    snn.fit(train_x, train_y, rand=True, lr=0.1, n_iters=1000, lr_decay=True)
     print("Train Accuracy:", snn.predict(train_x, train_y))
     print("Test Accuracy:", snn.predict(test_x, test_y))
     snn.plot_loss()
